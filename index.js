@@ -13,7 +13,7 @@ mongoose.connect(process.env.MONGO_URI)
   .catch((err) => console.error('Gagal konek MongoDB:', err));
 
 app.get('/', (req, res) => {
-  res.send('Server backend berjalan!');
+  res.send('Server backend running!');
 });
 
 const cors = require('cors');
