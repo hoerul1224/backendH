@@ -21,12 +21,15 @@ const cors = require('cors');
 app.use(cors());
 
 const authRoutes = require('./routes/authRoutes');
-const todoRoutes = require('./routes/todoRoutes');
-const ticketRoutes = require('./routes/ticketRoutes');
-app.use('/api/tickets', ticketRoutes);
+const healthCheckRoutes = require('./routes/healthCheckRoutes');
+app.use('/api/healthchecks', healthCheckRoutes);
 
 app.use('/api/auth', authRoutes);
-app.use('/api/todos', todoRoutes);
+app.use('/api/dcu', require('./routes/dcu'));
+app.use('/api/mcu', require('./routes/mcu'));
+app.use('/api/body-composition', require('./routes/bodyComposition'));
+app.use('/api/consultation', require('./routes/consultation'));
+app.use('/api/mini-mcu', require('./routes/miniMcu'));
 
 app.listen(PORT, () => {
   console.log(`Server running at http://localhost:${PORT}`);

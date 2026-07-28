@@ -9,15 +9,31 @@ const adminOnly = require('../middleware/adminOnly');
 // REGISTER
 router.post('/register', async (req, res) => {
   try {
-    const { email, password, phone, location, jabatan } = req.body;
+    const {
+      perwiraId, fullName, username, dateOfBirth, gender,
+      workLocation, department, employmentStatus, jobTitle, email, password,
+    } = req.body;
 
-    const existingUser = await User.findOne({ email });
-    if (existingUser) {
+    const existingEmail = await User.findOne({ email });
+    if (existingEmail) {
       return res.status(400).json({ error: 'Email sudah terdaftar' });
     }
 
+    const existingUsername = await User.findOne({ username });
+    if (existingUsername) {
+      return res.status(400).json({ error: 'Nama Perwira (username) sudah terdaftar' });
+    }
+
+    const existingPerwiraId = await User.findOne({ perwiraId });
+    if (existingPerwiraId) {
+      return res.status(400).json({ error: 'Perwira ID sudah terdaftar' });
+    }
+
     const hashedPassword = await bcrypt.hash(password, 10);
-    const user = await User.create({ email, password: hashedPassword, phone, location, jabatan });
+    const user = await User.create({
+      perwiraId, fullName, username, dateOfBirth, gender,
+      workLocation, department, employmentStatus, jobTitle, email, password: hashedPassword,
+    });
 
     res.status(201).json({ message: 'Registrasi berhasil', userId: user._id });
   } catch (err) {
