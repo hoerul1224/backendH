@@ -87,4 +87,49 @@ router.put('/users/:id/role', authMiddleware, adminOnly, async (req, res) => {
   }
 });
 
+// USER: lihat profil sendiri
+router.get('/me', authMiddleware, async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select('-password');
+    if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
+    res.json(user);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// USER: update identitas sendiri (field terbatas)
+router.put('/me', authMiddleware, async (req, res) => {
+  try {
+    const { fullName, dateOfBirth, gender, workLocation, department, employmentStatus, jobTitle } = req.body;
+    const user = await User.findByIdAndUpdate(
+      req.userId,
+      { fullName, dateOfBirth, gender, workLocation, department, employmentStatus, jobTitle },
+      { new: true }
+    ).select('-password');
+    if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
+    res.json(user);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// USER: ganti password sendiri
+router.put('/me/password', authMiddleware, async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.userId);
+    if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
+
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) return res.status(400).json({ error: 'Password lama salah' });
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    await user.save();
+    res.json({ message: 'Password berhasil diubah' });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
 module.exports = router;
