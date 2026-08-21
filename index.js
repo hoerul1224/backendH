@@ -9,16 +9,16 @@ app.use(express.json());
 
 // Koneksi ke MongoDB
 mongoose.connect(process.env.MONGO_URI)
-  .then(() => console.log('MongoDB connected'))
-  .catch((err) => console.error('Gagal konek MongoDB:', err));
+  .then(() => console.log('MongoDB connected Rul'))
+  .catch((err) => console.error('MongoDB Not Connected:', err));
 
 app.get('/', (req, res) => {
-  res.send('Server backend running!');
+  res.send('Server backend running rul!');
 });
 
 const cors = require('cors');
 // ...
-app.use(cors());
+app.use(cors({ origin: process.env.FRONTEND_URL }));
 
 const authRoutes = require('./routes/authRoutes');
 const healthCheckRoutes = require('./routes/healthCheckRoutes');

@@ -50,12 +50,12 @@ router.post('/admin/:userId', authMiddleware, adminOnly, async (req, res) => {
     const {
       date, examLocation, workStatus,
       diagnosis1, diagnosis2, diagnosis3,
-      temperature, oxygenSaturation, romberg, fitnessStatus,
+      temperature, oxygenSaturation, romberg, fitnessStatus, recommendation,
     } = req.body;
     const record = await MedicalCheckup.create({
       user: req.params.userId, date, examLocation, workStatus,
       diagnosis1, diagnosis2, diagnosis3,
-      temperature, oxygenSaturation, romberg, fitnessStatus,
+      temperature, oxygenSaturation, romberg, fitnessStatus, recommendation,
     });
     res.status(201).json(record);
   } catch (err) {

@@ -12,6 +12,7 @@ const medicalCheckupSchema = new mongoose.Schema({
   oxygenSaturation: Number,
   romberg: { type: String, default: '' },
   fitnessStatus: { type: String, enum: ['', 'laik', 'laik_dengan_catatan', 'tidak_laik'], default: '' },
+  recommendation: { type: String, default: '' },
   followUpNotes: { type: String, default: '' },
   followUpDone: { type: Boolean, default: false },
 }, { timestamps: true });
