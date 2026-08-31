@@ -5,6 +5,7 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 const adminOnly = require('../middleware/adminOnly');
+const dcuAccess = require('../middleware/dcuAccess');
 
 // REGISTER
 router.post('/register', async (req, res) => {
