@@ -9,10 +9,15 @@ const userSchema = new mongoose.Schema({
   workLocation: { type: String, required: true },
   department: { type: String, required: true },
   employmentStatus: { type: String, required: true },
-  jobTitle: { type: String, required: true },   // <-- tambahan
+  jobTitle: { type: String, required: true },
+  workClassification: {
+    type: String,
+    enum: ['Plant', 'Komorbid', 'Security & CSO', 'Driver', 'Health', 'Office'],
+    required: true,
+  },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  role: { type: String, enum: ['pekerja', 'petugas_dcu', 'tenaga_kesehatan'], default: 'pekerja' },
+  role: { type: String, enum: ['user', 'admin'], default: 'user' },
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);

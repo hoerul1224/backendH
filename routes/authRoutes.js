@@ -12,28 +12,18 @@ router.post('/register', async (req, res) => {
   try {
     const {
       perwiraId, fullName, username, dateOfBirth, gender,
-      workLocation, department, employmentStatus, jobTitle, email, password,
+      workLocation, department, employmentStatus, jobTitle, workClassification, email, password,
     } = req.body;
 
-    const existingEmail = await User.findOne({ email });
-    if (existingEmail) {
-      return res.status(400).json({ error: 'Email sudah terdaftar' });
-    }
-
-    const existingUsername = await User.findOne({ username });
-    if (existingUsername) {
-      return res.status(400).json({ error: 'Nama Perwira (username) sudah terdaftar' });
-    }
-
-    const existingPerwiraId = await User.findOne({ perwiraId });
-    if (existingPerwiraId) {
-      return res.status(400).json({ error: 'Perwira ID sudah terdaftar' });
+    const existingUser = await User.findOne({ $or: [{ email }, { username }, { perwiraId }] });
+    if (existingUser) {
+      return res.status(400).json({ error: 'Email, username, atau Perwira ID sudah terdaftar' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
     const user = await User.create({
       perwiraId, fullName, username, dateOfBirth, gender,
-      workLocation, department, employmentStatus, jobTitle, email, password: hashedPassword,
+      workLocation, department, employmentStatus, jobTitle, workClassification, email, password: hashedPassword,
     });
 
     res.status(201).json({ message: 'Registrasi berhasil', userId: user._id });
@@ -112,6 +102,16 @@ router.put('/me', authMiddleware, async (req, res) => {
     res.json(user);
   } catch (err) {
     res.status(400).json({ error: err.message });
+  }
+});
+
+// GET daftar ringkas semua user (untuk autocomplete, bisa diakses non-admin yang punya akses DCU)
+router.get('/users/list', authMiddleware, async (req, res) => {
+  try {
+    const users = await User.find().select('perwiraId fullName email jobTitle employmentStatus workClassification');
+    res.json(users);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 

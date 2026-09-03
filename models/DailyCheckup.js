@@ -6,6 +6,11 @@ const dailyCheckupSchema = new mongoose.Schema({
   complaint: { type: String, default: '' },
   examLocation: { type: String, default: '' },
   workStatus: { type: String, default: '' },
+  attendanceStatus: {
+    type: String,
+    enum: ['', 'Bekerja', 'Izin', 'Sakit', 'Libur', 'Dinas'],
+    default: '',
+  },
   systolic: Number,
   diastolic: Number,
   heartRate: Number,
