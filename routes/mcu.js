@@ -44,6 +44,47 @@ router.get('/admin', authMiddleware, adminOnly, async (req, res) => {
   }
 });
 
+// ADMIN: 10 diagnosis terbanyak dari MCU (gabungan diagnosis1/2/3, filter opsional bulan/tahun)
+router.get('/admin/top-diagnosis', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const { month, year, limit } = req.query;
+    const match = {};
+
+    if (year) {
+      const y = parseInt(year);
+      if (month) {
+        const m = parseInt(month) - 1;
+        match.date = { $gte: new Date(y, m, 1), $lt: new Date(y, m + 1, 1) };
+      } else {
+        match.date = { $gte: new Date(y, 0, 1), $lt: new Date(y + 1, 0, 1) };
+      }
+    }
+
+    const results = await MedicalCheckup.aggregate([
+      { $match: match },
+      {
+        $project: {
+          diagnoses: ['$diagnosis1', '$diagnosis2', '$diagnosis3'],
+        },
+      },
+      { $unwind: '$diagnoses' },
+      { $match: { diagnoses: { $ne: '' } } },
+      {
+        $group: {
+          _id: { $toLower: { $trim: { input: '$diagnoses' } } },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { count: -1 } },
+      { $limit: parseInt(limit) || 10 },
+    ]);
+
+    res.json(results.map((r) => ({ diagnosis: r._id, count: r.count })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ADMIN: tambah record MCU baru untuk user tertentu
 router.post('/admin/:userId', authMiddleware, adminOnly, async (req, res) => {
   try {
