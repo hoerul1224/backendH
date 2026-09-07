@@ -5,6 +5,7 @@ const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 const adminOnly = require('../middleware/adminOnly');
 const dcuAccess = require('../middleware/dcuAccess');
+const summaryAccess = require('../middleware/summaryAccess');
 
 function buildDateFilter(query) {
   const { day, month, year } = query;
@@ -47,7 +48,7 @@ router.get('/admin', authMiddleware, dcuAccess, async (req, res) => {
 });
 
 // ADMIN: rekap bulanan per klasifikasi pekerjaan (Bekerja/Izin/Sakit/Libur/Dinas/Fit/Unfit)
-router.get('/admin/summary', authMiddleware, dcuAccess, async (req, res) => {
+router.get('/admin/summary', authMiddleware, summaryAccess, async (req, res) => {
   try {
     const { month, year } = req.query;
     if (!month || !year) return res.status(400).json({ error: 'month dan year wajib diisi' });
@@ -100,7 +101,7 @@ router.get('/admin/summary', authMiddleware, dcuAccess, async (req, res) => {
 });
 
 // ADMIN: rekap harian (per tanggal) untuk 1 klasifikasi (atau semua)
-router.get('/admin/daily', authMiddleware, dcuAccess, async (req, res) => {
+router.get('/admin/daily', authMiddleware, summaryAccess, async (req, res) => {
   try {
     const { month, year, classification } = req.query;
     if (!month || !year) return res.status(400).json({ error: 'month dan year wajib diisi' });
@@ -142,7 +143,7 @@ router.get('/admin/daily', authMiddleware, dcuAccess, async (req, res) => {
 });
 
 // ADMIN: 10 keluhan terbanyak dari data DCU (filter opsional bulan/tahun)
-router.get('/admin/top-complaints', authMiddleware, dcuAccess, async (req, res) => {
+router.get('/admin/top-complaints', authMiddleware, summaryAccess, async (req, res) => {
   try {
     const { month, year, limit } = req.query;
     const match = { complaint: { $ne: '' } };
@@ -170,6 +171,43 @@ router.get('/admin/top-complaints', authMiddleware, dcuAccess, async (req, res) 
     ]);
 
     res.json(results.map((r) => ({ complaint: r._id, count: r.count })));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// ADMIN/KEPALA DEPT: daftar nama user berdasarkan status Fit/Unfit pada bulan tertentu
+router.get('/admin/users-by-status', authMiddleware, summaryAccess, async (req, res) => {
+  try {
+    const { month, year, status } = req.query;
+    if (!month || !year || !status) {
+      return res.status(400).json({ error: 'month, year, dan status wajib diisi' });
+    }
+    const y = parseInt(year);
+    const m = parseInt(month) - 1;
+
+    const fitnessFilter = status === 'Unfit'
+      ? { fitnessStatus: 'tidak_laik' }
+      : { fitnessStatus: { $in: ['laik', 'laik_dengan_catatan'] } };
+
+    const records = await DailyCheckup.find({
+      date: { $gte: new Date(y, m, 1), $lt: new Date(y, m + 1, 1) },
+      ...fitnessFilter,
+    }).populate('user', 'fullName perwiraId email');
+
+    const seen = new Map();
+    records.forEach((r) => {
+      if (r.user && !seen.has(String(r.user._id))) {
+        seen.set(String(r.user._id), {
+          userId: r.user._id,
+          fullName: r.user.fullName,
+          perwiraId: r.user.perwiraId,
+          email: r.user.email,
+        });
+      }
+    });
+
+    res.json(Array.from(seen.values()));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -17,7 +17,11 @@ const userSchema = new mongoose.Schema({
   },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
-  role: { type: String, enum: ['user', 'admin'], default: 'user' },
+  role: {
+  type: String,
+  enum: ['pekerja', 'petugas_dcu', 'tenaga_kesehatan', 'kepala_departemen'],
+  default: 'pekerja',
+},
 }, { timestamps: true });
 
 module.exports = mongoose.model('User', userSchema);
