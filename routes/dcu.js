@@ -59,7 +59,7 @@ router.get('/admin/summary', authMiddleware, summaryAccess, async (req, res) => 
       date: { $gte: new Date(y, m, 1), $lt: new Date(y, m + 1, 1) },
     }).populate('user', 'workClassification');
 
-    const classifications = ['Plant', 'Komorbid', 'Security & CSO', 'Driver', 'Health', 'Office'];
+    const classifications = ['Plant', 'Komorbid', 'Security & CSO', 'Driver', 'Health', 'Office', 'Lainnya'];
     const userCounts = await User.aggregate([
       { $match: { workClassification: { $in: classifications } } },
       { $group: { _id: '$workClassification', count: { $sum: 1 } } },
@@ -74,9 +74,9 @@ router.get('/admin/summary', authMiddleware, summaryAccess, async (req, res) => 
     }));
 
     records.forEach((r) => {
-      const classification = r.user?.workClassification;
-      const entry = summary.find((s) => s.classification === classification);
-      if (!entry) return;
+  const classification = r.user?.workClassification || 'Lainnya';
+  const entry = summary.find((s) => s.classification === classification) || summary.find((s) => s.classification === 'Lainnya');
+  if (!entry) return;
 
       if (r.attendanceStatus && entry[r.attendanceStatus] !== undefined) {
         entry[r.attendanceStatus] += 1;

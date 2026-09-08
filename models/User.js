@@ -10,10 +10,10 @@ const userSchema = new mongoose.Schema({
   department: { type: String, required: true },
   employmentStatus: { type: String, required: true },
   jobTitle: { type: String, required: true },
-  workClassification: {
+    workClassification: {
     type: String,
-    enum: ['Plant', 'Komorbid', 'Security & CSO', 'Driver', 'Health', 'Office'],
-    required: true,
+    enum: ['', 'Plant', 'Komorbid', 'Security & CSO', 'Driver', 'Health', 'Office'],
+    default: '',
   },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },

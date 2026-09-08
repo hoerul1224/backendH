@@ -35,6 +35,18 @@ router.post('/', authMiddleware, async (req, res) => {
   }
 });
 
+// TENAGA KESEHATAN / PETUGAS DCU: lihat SEMUA data body composition sekaligus
+router.get('/admin', authMiddleware, dcuAccess, async (req, res) => {
+  try {
+    const records = await BodyComposition.find({})
+      .populate('user', 'fullName email perwiraId')
+      .sort({ date: -1 });
+    res.json(records);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // TENAGA KESEHATAN / PETUGAS DCU: lihat riwayat body composition user tertentu
 router.get('/admin/:userId', authMiddleware, dcuAccess, async (req, res) => {
   try {

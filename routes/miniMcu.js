@@ -61,6 +61,18 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
+// ADMIN: lihat SEMUA data mini MCU sekaligus
+router.get('/admin', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const records = await MiniMcu.find({})
+      .populate('user', 'fullName email perwiraId gender')
+      .sort({ date: -1 });
+    res.json(records.map((r) => withLabels(r, r.user?.gender)));
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ADMIN: lihat riwayat mini MCU user tertentu
 router.get('/admin/:userId', authMiddleware, adminOnly, async (req, res) => {
   try {

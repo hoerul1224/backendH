@@ -49,6 +49,18 @@ router.get('/admin/top-diagnosis', authMiddleware, summaryAccess, async (req, re
   }
 });
 
+// TENAGA KESEHATAN / PETUGAS DCU: lihat SEMUA riwayat konsultasi sekaligus
+router.get('/admin', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const records = await Consultation.find({})
+      .populate('user', 'fullName email perwiraId')
+      .sort({ date: -1 });
+    res.json(records);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ADMIN: lihat riwayat konsultasi user tertentu
 router.get('/admin/:userId', authMiddleware, adminOnly, async (req, res) => {
   try {

@@ -67,10 +67,18 @@ router.get('/users', authMiddleware, adminOnly, async (req, res) => {
 });
 
 // UPDATE role user (khusus admin)
-router.put('/users/:id/role', authMiddleware, adminOnly, async (req, res) => {
+router.put('/users/:id/work-classification', authMiddleware, adminOnly, async (req, res) => {
   try {
-    const { role } = req.body;
-    const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true }).select('-password');
+    const { workClassification } = req.body;
+    const validValues = ['Plant', 'Komorbid', 'Security & CSO', 'Driver', 'Health', 'Office'];
+    if (!validValues.includes(workClassification)) {
+      return res.status(400).json({ error: 'workClassification tidak valid' });
+    }
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { workClassification },
+      { new: true }
+    );
     if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
     res.json(user);
   } catch (err) {
