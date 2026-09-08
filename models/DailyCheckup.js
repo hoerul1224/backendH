@@ -18,6 +18,7 @@ const dailyCheckupSchema = new mongoose.Schema({
   oxygenSaturation: Number,
   romberg: { type: String, default: '' },
   fitnessStatus: { type: String, enum: ['', 'laik', 'laik_dengan_catatan', 'tidak_laik'], default: '' },
+  photo: { type: String, default: '' },
 }, { timestamps: true });
 
 module.exports = mongoose.model('DailyCheckup', dailyCheckupSchema);

@@ -219,12 +219,12 @@ router.post('/admin/:userId', authMiddleware, dcuAccess, async (req, res) => {
     const {
       date, complaint, examLocation, workStatus, attendanceStatus,
       systolic, diastolic, heartRate, temperature, oxygenSaturation,
-      romberg, fitnessStatus,
+      romberg, fitnessStatus, photo,
     } = req.body;
     const record = await DailyCheckup.create({
       user: req.params.userId, date, complaint, examLocation, workStatus, attendanceStatus,
       systolic, diastolic, heartRate, temperature, oxygenSaturation,
-      romberg, fitnessStatus,
+      romberg, fitnessStatus, photo,
     });
     res.status(201).json(record);
   } catch (err) {

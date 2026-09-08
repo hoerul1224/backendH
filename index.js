@@ -5,7 +5,7 @@ const mongoose = require('mongoose');
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 
 const path = require('path');
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -20,8 +20,24 @@ app.get('/', (req, res) => {
 });
 
 const cors = require('cors');
+
+const allowedOrigins = [
+  'http://localhost:5173',
+  process.env.FRONTEND_URL, // tetap simpan buat fleksibilitas .env
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    // request tanpa origin (misal dari Postman) tetap diizinkan
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin) || /\.devtunnels\.ms$/.test(new URL(origin).hostname)) {
+      return callback(null, true);
+    }
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
 // ...
-app.use(cors({ origin: process.env.FRONTEND_URL }));
 
 const authRoutes = require('./routes/authRoutes');
 const healthCheckRoutes = require('./routes/healthCheckRoutes');
