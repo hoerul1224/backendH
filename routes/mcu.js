@@ -3,6 +3,7 @@ const router = express.Router();
 const MedicalCheckup = require('../models/MedicalCheckup');
 const authMiddleware = require('../middleware/auth');
 const adminOnly = require('../middleware/adminOnly');
+const summaryAccess = require('../middleware/summaryAccess');
 
 function buildDateFilter(query) {
   const { day, month, year } = query;
@@ -45,7 +46,7 @@ router.get('/admin', authMiddleware, adminOnly, async (req, res) => {
 });
 
 // ADMIN: 10 diagnosis terbanyak dari MCU (gabungan diagnosis1/2/3, filter opsional bulan/tahun)
-router.get('/admin/top-diagnosis', authMiddleware, adminOnly, async (req, res) => {
+router.get('/admin/top-diagnosis', authMiddleware, summaryAccess, async (req, res) => {
   try {
     const { month, year, limit } = req.query;
     const match = {};

@@ -7,6 +7,12 @@ const consultationSchema = new mongoose.Schema({
   complaint: { type: String, default: '' },
   diagnosis: { type: String, default: '' },
   recommendation: { type: String, default: '' },
+  attachments: [{
+    originalName: { type: String, required: true },
+    filename: { type: String, required: true },
+    path: { type: String, required: true },
+    uploadedAt: { type: Date, default: Date.now },
+  }],
 }, { timestamps: true });
 
 module.exports = mongoose.model('Consultation', consultationSchema);
