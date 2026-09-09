@@ -55,14 +55,27 @@ router.get('/admin/summary', authMiddleware, summaryAccess, async (req, res) => 
     const y = parseInt(year);
     const m = parseInt(month) - 1;
 
-    const records = await DailyCheckup.find({
+        const records = await DailyCheckup.find({
       date: { $gte: new Date(y, m, 1), $lt: new Date(y, m + 1, 1) },
     }).populate('user', 'workClassification');
 
+    const uniqueUserIds = new Set(records.map((r) => String(r.user?._id)));
+    const usersWithDcu = uniqueUserIds.size;
+
     const classifications = ['Plant', 'Komorbid', 'Security & CSO', 'Driver', 'Health', 'Office', 'Lainnya'];
-    const userCounts = await User.aggregate([
-      { $match: { workClassification: { $in: classifications } } },
-      { $group: { _id: '$workClassification', count: { $sum: 1 } } },
+        const userCounts = await User.aggregate([
+      {
+        $project: {
+          classification: {
+            $cond: [
+              { $in: ['$workClassification', classifications] },
+              '$workClassification',
+              'Lainnya',
+            ],
+          },
+        },
+      },
+      { $group: { _id: '$classification', count: { $sum: 1 } } },
     ]);
     const userCountMap = Object.fromEntries(userCounts.map((u) => [u._id, u.count]));
 
@@ -94,7 +107,7 @@ router.get('/admin/summary', authMiddleware, summaryAccess, async (req, res) => 
       return { ...s, totalDcu, ratio };
     });
 
-    res.json({ month: m + 1, year: y, summary: withRatio });
+        res.json({ month: m + 1, year: y, summary: withRatio, usersWithDcu });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
