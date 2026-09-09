@@ -15,6 +15,11 @@ const medicalCheckupSchema = new mongoose.Schema({
   recommendation: { type: String, default: '' },
   followUpNotes: { type: String, default: '' },
   followUpDone: { type: Boolean, default: false },
+  followUpDocument: { type: String, default: '' },
+  followUpUploadedAt: { type: Date },
+  followUpStatus: { type: String, enum: ['belum_verifikasi', 'terverifikasi'], default: 'belum_verifikasi' },
+  followUpVerifiedAt: { type: Date },
+  followUpVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
 module.exports = mongoose.model('MedicalCheckup', medicalCheckupSchema);

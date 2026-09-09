@@ -86,6 +86,37 @@ router.get('/admin/top-diagnosis', authMiddleware, summaryAccess, async (req, re
   }
 });
 
+// ADMIN: % tindak lanjut MCU per status pekerja (filter opsional bulan/tahun)
+router.get('/admin/followup-summary', authMiddleware, summaryAccess, async (req, res) => {
+  try {
+    const filter = buildDateFilter(req.query);
+    const records = await MedicalCheckup.find(filter);
+
+    const groups = {};
+    records.forEach((r) => {
+      const key = r.workStatus || 'Lainnya';
+      if (!groups[key]) groups[key] = { total: 0, terverifikasi: 0 };
+      groups[key].total += 1;
+      if (r.followUpStatus === 'terverifikasi') groups[key].terverifikasi += 1;
+    });
+
+    const summary = Object.entries(groups).map(([workStatus, v]) => ({
+      workStatus,
+      total: v.total,
+      terverifikasi: v.terverifikasi,
+      percentage: v.total > 0 ? Math.round((v.terverifikasi / v.total) * 100) : 0,
+    }));
+
+    const totalAll = records.length;
+    const totalTerverifikasi = records.filter((r) => r.followUpStatus === 'terverifikasi').length;
+    const overallPercentage = totalAll > 0 ? Math.round((totalTerverifikasi / totalAll) * 100) : 0;
+
+    res.json({ summary, overallPercentage, totalAll, totalTerverifikasi });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ADMIN: tambah record MCU baru untuk user tertentu
 router.post('/admin/:userId', authMiddleware, adminOnly, async (req, res) => {
   try {
@@ -105,16 +136,72 @@ router.post('/admin/:userId', authMiddleware, adminOnly, async (req, res) => {
   }
 });
 
-// USER: tindak lanjut MCU (tetap seperti sebelumnya, pakai record terbaru)
+// USER: upload/upload ulang bukti tindak lanjut MCU miliknya sendiri
 router.put('/:id/followup', authMiddleware, async (req, res) => {
   try {
-    const { followUpNotes } = req.body;
+    const { followUpNotes, followUpDocument } = req.body;
+    if (!followUpDocument) {
+      return res.status(400).json({ error: 'Dokumen bukti tindak lanjut wajib diunggah' });
+    }
     const record = await MedicalCheckup.findOneAndUpdate(
       { _id: req.params.id, user: req.userId },
-      { followUpDone: true, followUpNotes },
+      {
+        followUpNotes,
+        followUpDocument,
+        followUpDone: true,
+        followUpUploadedAt: new Date(),
+        followUpStatus: 'belum_verifikasi',
+        followUpVerifiedAt: null,
+        followUpVerifiedBy: null,
+      },
       { new: true }
     );
     if (!record) return res.status(404).json({ error: 'Data MCU tidak ditemukan' });
+    res.json(record);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ADMIN/NAKES: upload bukti tindak lanjut atas nama pekerja
+router.put('/admin/:id/followup', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const { followUpNotes, followUpDocument } = req.body;
+    if (!followUpDocument) {
+      return res.status(400).json({ error: 'Dokumen bukti tindak lanjut wajib diunggah' });
+    }
+    const record = await MedicalCheckup.findByIdAndUpdate(
+      req.params.id,
+      {
+        followUpNotes,
+        followUpDocument,
+        followUpDone: true,
+        followUpUploadedAt: new Date(),
+        followUpStatus: 'belum_verifikasi',
+        followUpVerifiedAt: null,
+        followUpVerifiedBy: null,
+      },
+      { new: true }
+    );
+    if (!record) return res.status(404).json({ error: 'Data MCU tidak ditemukan' });
+    res.json(record);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// ADMIN/NAKES: verifikasi dokumen tindak lanjut
+router.put('/admin/:id/verify', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const record = await MedicalCheckup.findById(req.params.id);
+    if (!record) return res.status(404).json({ error: 'Data MCU tidak ditemukan' });
+    if (!record.followUpDocument) {
+      return res.status(400).json({ error: 'Belum ada dokumen tindak lanjut yang diunggah' });
+    }
+    record.followUpStatus = 'terverifikasi';
+    record.followUpVerifiedAt = new Date();
+    record.followUpVerifiedBy = req.userId;
+    await record.save();
     res.json(record);
   } catch (err) {
     res.status(400).json({ error: err.message });
