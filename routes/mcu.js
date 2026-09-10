@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 
 const MedicalCheckup = require('../models/MedicalCheckup');
+const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 const adminOnly = require('../middleware/adminOnly');
 const summaryAccess = require('../middleware/summaryAccess');
@@ -222,7 +223,12 @@ router.get(
   summaryAccess,
   async (req, res) => {
     try {
-      const filter = buildDateFilter(req.query);
+      const { workStatus } = req.query;
+
+      const filter = {
+        ...buildDateFilter(req.query),
+        ...(workStatus ? { workStatus } : {}),
+      };
 
       const records = await MedicalCheckup
         .find(filter)
@@ -241,6 +247,7 @@ router.get(
       const fitnessStatuses = [
         'laik',
         'laik_dengan_catatan',
+        'laik_dengan_restriksi',
         'tidak_laik',
       ];
 
@@ -288,6 +295,28 @@ router.get(
             )
           : 0;
 
+      const uniqueUserIdsInRecords = Array.from(
+        new Set(
+          records.map((record) => String(record.user))
+        )
+      );
+
+      const [totalUsers, usersWithMcu] = await Promise.all([
+        User.countDocuments({
+          role: 'pekerja',
+          ...(workStatus
+            ? { employmentStatus: workStatus }
+            : {}),
+        }),
+        User.countDocuments({
+          _id: { $in: uniqueUserIdsInRecords },
+          role: 'pekerja',
+          ...(workStatus
+            ? { employmentStatus: workStatus }
+            : {}),
+        }),
+      ]);
+
       res.json({
         healthDegreeMCU: countByField(
           'healthDegree',
@@ -300,6 +329,22 @@ router.get(
           fitnessStatuses,
           records
         ),
+
+        mcuStatus: [
+          {
+            label: 'Sudah MCU',
+            count: usersWithMcu,
+          },
+          {
+            label: 'Belum MCU',
+            count: Math.max(
+              totalUsers - usersWithMcu,
+              0
+            ),
+          },
+        ],
+        totalUsers,
+        usersWithMcu,
 
         followUpStatus: [
           {
@@ -349,31 +394,40 @@ router.get(
   async (req, res) => {
     try {
       const filter = buildDateFilter(req.query);
-
-      const records = await MedicalCheckup.find(filter);
-
+      const records = await MedicalCheckup.find(
+        filter
+      ).lean();
+      const workerStatuses = [
+        'Direksi & Manajemen',
+        'PWTT',
+        'PWT',
+        'TKJP',
+        'Tamu',
+      ];
       const groups = {};
-
+      workerStatuses.forEach((status) => {
+        groups[status] = {
+          total: 0,
+          terverifikasi: 0,
+        };
+      });
       records.forEach((record) => {
-        const key = record.workStatus || 'Lainnya';
-
-        if (!groups[key]) {
-          groups[key] = {
+        const workStatus =
+          record.workStatus || 'Lainnya';
+        if (!groups[workStatus]) {
+          groups[workStatus] = {
             total: 0,
             terverifikasi: 0,
           };
         }
-
-        groups[key].total += 1;
-
+        groups[workStatus].total += 1;
         if (
           record.followUpStatus ===
           'terverifikasi'
         ) {
-          groups[key].terverifikasi += 1;
+          groups[workStatus].terverifikasi += 1;
         }
       });
-
       const summary = Object.entries(groups).map(
         ([workStatus, value]) => ({
           workStatus,
@@ -389,16 +443,13 @@ router.get(
               : 0,
         })
       );
-
       const totalAll = records.length;
-
       const totalTerverifikasi =
         records.filter(
           (record) =>
             record.followUpStatus ===
             'terverifikasi'
         ).length;
-
       const overallPercentage =
         totalAll > 0
           ? Math.round(
@@ -406,7 +457,6 @@ router.get(
                 100
             )
           : 0;
-
       res.json({
         summary,
         overallPercentage,
@@ -414,6 +464,10 @@ router.get(
         totalTerverifikasi,
       });
     } catch (err) {
+      console.error(
+        'Gagal mengambil summary TL MCU:',
+        err
+      );
       res.status(500).json({
         error: err.message,
       });
@@ -435,9 +489,6 @@ router.post(
         diagnosis1,
         diagnosis2,
         diagnosis3,
-        temperature,
-        oxygenSaturation,
-        romberg,
         healthDegree,
         fitnessStatus,
         recommendation,
@@ -453,9 +504,6 @@ router.post(
         diagnosis1,
         diagnosis2,
         diagnosis3,
-        temperature,
-        oxygenSaturation,
-        romberg,
         healthDegree,
         fitnessStatus,
         recommendation,
@@ -597,35 +645,115 @@ router.put(
   summaryAccess,
   async (req, res) => {
     try {
-      const record = await MedicalCheckup.findById(
-        req.params.id
+      const {
+        followUpHealthDegree,
+        followUpFitnessStatus,
+      } = req.body;
+
+      console.log(
+        'DATA DITERIMA BACKEND:',
+        req.body
       );
 
-      if (!record) {
-        return res.status(404).json({
-          error: 'Data MCU tidak ditemukan',
-        });
-      }
+      const validHealthDegrees = [
+        'P1',
+        'P2',
+        'P3',
+        'P4',
+        'P5',
+        'P6',
+        'P7',
+      ];
 
-      if (!record.followUpDocument) {
+      const validFitnessStatuses = [
+        'laik',
+        'laik_dengan_catatan',
+        'laik_dengan_restriksi',
+        'tidak_laik',
+      ];
+
+      if (
+        !validHealthDegrees.includes(
+          followUpHealthDegree
+        )
+      ) {
         return res.status(400).json({
           error:
-            'Belum ada dokumen tindak lanjut yang diunggah',
+            'Derajat kesehatan setelah TL MCU wajib dipilih.',
         });
       }
 
-      record.followUpStatus = 'terverifikasi';
-      record.followUpVerifiedAt = new Date();
-      record.followUpVerifiedBy = req.userId;
+      if (
+        !validFitnessStatuses.includes(
+          followUpFitnessStatus
+        )
+      ) {
+        return res.status(400).json({
+          error:
+            'Kelaikan kerja setelah TL MCU wajib dipilih.',
+        });
+      }
 
-      await record.save();
+      const existingRecord =
+        await MedicalCheckup.findById(
+          req.params.id
+        );
+
+      if (!existingRecord) {
+        return res.status(404).json({
+          error: 'Data MCU tidak ditemukan.',
+        });
+      }
+
+      if (!existingRecord.followUpDocument) {
+        return res.status(400).json({
+          error:
+            'Belum ada dokumen tindak lanjut yang diunggah.',
+        });
+      }
+
+      const record =
+        await MedicalCheckup.findByIdAndUpdate(
+          req.params.id,
+          {
+            $set: {
+              followUpHealthDegree,
+              followUpFitnessStatus,
+              followUpStatus: 'terverifikasi',
+              followUpVerifiedAt: new Date(),
+              followUpVerifiedBy: req.userId,
+            },
+          },
+          {
+            new: true,
+            runValidators: true,
+          }
+        );
+
+      console.log(
+        'DATA BERHASIL DISIMPAN:',
+        {
+          id: record._id,
+          followUpStatus:
+            record.followUpStatus,
+          followUpHealthDegree:
+            record.followUpHealthDegree,
+          followUpFitnessStatus:
+            record.followUpFitnessStatus,
+        }
+      );
 
       res.json({
         message:
-          'Dokumen tindak lanjut berhasil diverifikasi',
+          'Hasil tindak lanjut berhasil disimpan.',
         record,
       });
     } catch (err) {
+      console.error(
+        'ERROR VERIFIKASI TL MCU:',
+        err
+      );
+
       res.status(400).json({
         error: err.message,
       });

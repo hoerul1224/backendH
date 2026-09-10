@@ -50,13 +50,24 @@ router.get('/admin', authMiddleware, dcuAccess, async (req, res) => {
 // ADMIN: rekap bulanan per klasifikasi pekerjaan (Bekerja/Izin/Sakit/Libur/Dinas/Fit/Unfit)
 router.get('/admin/summary', authMiddleware, summaryAccess, async (req, res) => {
   try {
-    const { month, year } = req.query;
-    if (!month || !year) return res.status(400).json({ error: 'month dan year wajib diisi' });
+    const { day, month, year } = req.query;
+    if (!year) return res.status(400).json({ error: 'year wajib diisi' });
     const y = parseInt(year);
-    const m = parseInt(month) - 1;
 
-        const records = await DailyCheckup.find({
-      date: { $gte: new Date(y, m, 1), $lt: new Date(y, m + 1, 1) },
+    let dateFilter;
+    if (day && month) {
+      const m = parseInt(month) - 1;
+      const d = parseInt(day);
+      dateFilter = { $gte: new Date(y, m, d), $lt: new Date(y, m, d + 1) };
+    } else if (month) {
+      const m = parseInt(month) - 1;
+      dateFilter = { $gte: new Date(y, m, 1), $lt: new Date(y, m + 1, 1) };
+    } else {
+      dateFilter = { $gte: new Date(y, 0, 1), $lt: new Date(y + 1, 0, 1) };
+    }
+
+    const records = await DailyCheckup.find({
+      date: dateFilter,
     }).populate('user', 'workClassification');
 
     const uniqueUserIds = new Set(records.map((r) => String(r.user?._id)));
@@ -107,7 +118,7 @@ router.get('/admin/summary', authMiddleware, summaryAccess, async (req, res) => 
       return { ...s, totalDcu, ratio };
     });
 
-        res.json({ month: m + 1, year: y, summary: withRatio, usersWithDcu });
+        res.json({ day: day ? parseInt(day) : null, month: month ? parseInt(month) : null, year: y, summary: withRatio, usersWithDcu });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
@@ -117,16 +128,47 @@ router.get('/admin/summary', authMiddleware, summaryAccess, async (req, res) => 
 router.get('/admin/daily', authMiddleware, summaryAccess, async (req, res) => {
   try {
     const { month, year, classification } = req.query;
-    if (!month || !year) return res.status(400).json({ error: 'month dan year wajib diisi' });
+    if (!year) return res.status(400).json({ error: 'year wajib diisi' });
     const y = parseInt(year);
-    const m = parseInt(month) - 1;
-    const daysInMonth = new Date(y, m + 1, 0).getDate();
 
+    if (month) {
+      const m = parseInt(month) - 1;
+      const daysInMonth = new Date(y, m + 1, 0).getDate();
+
+      const records = await DailyCheckup.find({
+        date: { $gte: new Date(y, m, 1), $lt: new Date(y, m + 1, 1) },
+      }).populate('user', 'workClassification');
+
+      const daily = Array.from({ length: daysInMonth }, (_, i) => ({
+        day: i + 1,
+        Bekerja: 0, Izin: 0, Sakit: 0, Libur: 0, Dinas: 0,
+        Fit: 0, Unfit: 0,
+      }));
+
+      records.forEach((r) => {
+        if (classification && r.user?.workClassification !== classification) return;
+        const d = new Date(r.date).getDate();
+        const entry = daily[d - 1];
+        if (!entry) return;
+        if (r.attendanceStatus && entry[r.attendanceStatus] !== undefined) {
+          entry[r.attendanceStatus] += 1;
+        }
+        if (r.fitnessStatus === 'tidak_laik') {
+          entry.Unfit += 1;
+        } else if (r.fitnessStatus === 'laik' || r.fitnessStatus === 'laik_dengan_catatan') {
+          entry.Fit += 1;
+        }
+      });
+
+      return res.json({ mode: 'daily', month: m + 1, year: y, classification: classification || 'Semua', daily });
+    }
+
+    // Tanpa month = mode Tahunan: rekap per bulan (1-12)
     const records = await DailyCheckup.find({
-      date: { $gte: new Date(y, m, 1), $lt: new Date(y, m + 1, 1) },
+      date: { $gte: new Date(y, 0, 1), $lt: new Date(y + 1, 0, 1) },
     }).populate('user', 'workClassification');
 
-    const daily = Array.from({ length: daysInMonth }, (_, i) => ({
+    const monthly = Array.from({ length: 12 }, (_, i) => ({
       day: i + 1,
       Bekerja: 0, Izin: 0, Sakit: 0, Libur: 0, Dinas: 0,
       Fit: 0, Unfit: 0,
@@ -134,11 +176,9 @@ router.get('/admin/daily', authMiddleware, summaryAccess, async (req, res) => {
 
     records.forEach((r) => {
       if (classification && r.user?.workClassification !== classification) return;
-
-      const d = new Date(r.date).getDate();
-      const entry = daily[d - 1];
+      const mIndex = new Date(r.date).getMonth();
+      const entry = monthly[mIndex];
       if (!entry) return;
-
       if (r.attendanceStatus && entry[r.attendanceStatus] !== undefined) {
         entry[r.attendanceStatus] += 1;
       }
@@ -149,7 +189,7 @@ router.get('/admin/daily', authMiddleware, summaryAccess, async (req, res) => {
       }
     });
 
-    res.json({ month: m + 1, year: y, classification: classification || 'Semua', daily });
+    res.json({ mode: 'monthly', year: y, classification: classification || 'Semua', daily: monthly });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

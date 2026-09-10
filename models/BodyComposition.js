@@ -9,7 +9,6 @@ const bodyCompositionSchema = new mongoose.Schema({
   bodyFatPercent: Number,
   muscleMass: Number,
   visceralFat: Number,
-  bodyWaterPercent: Number,
 }, { timestamps: true });
 
 module.exports = mongoose.model('BodyComposition', bodyCompositionSchema);

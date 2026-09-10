@@ -23,11 +23,11 @@ router.get('/', authMiddleware, async (req, res) => {
 // USER (Pekerja): tambah data body composition milik sendiri
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { date, weight, height, bodyFatPercent, muscleMass, visceralFat, bodyWaterPercent } = req.body;
+    const { date, weight, height, bodyFatPercent, muscleMass, visceralFat } = req.body;
     const bmi = computeBmi(weight, height);
     const record = await BodyComposition.create({
       user: req.userId, date, weight, height, bmi,
-      bodyFatPercent, muscleMass, visceralFat, bodyWaterPercent,
+      bodyFatPercent, muscleMass, visceralFat,
     });
     res.status(201).json(record);
   } catch (err) {
@@ -60,11 +60,11 @@ router.get('/admin/:userId', authMiddleware, dcuAccess, async (req, res) => {
 // TENAGA KESEHATAN / PETUGAS DCU: tambah record body composition untuk user tertentu
 router.post('/admin/:userId', authMiddleware, dcuAccess, async (req, res) => {
   try {
-    const { date, weight, height, bodyFatPercent, muscleMass, visceralFat, bodyWaterPercent } = req.body;
+    const { date, weight, height, bodyFatPercent, muscleMass, visceralFat } = req.body;
     const bmi = computeBmi(weight, height);
     const record = await BodyComposition.create({
       user: req.params.userId, date, weight, height, bmi,
-      bodyFatPercent, muscleMass, visceralFat, bodyWaterPercent,
+      bodyFatPercent, muscleMass, visceralFat,
     });
     res.status(201).json(record);
   } catch (err) {

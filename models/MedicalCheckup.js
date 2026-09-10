@@ -15,6 +15,7 @@ const FITNESS_STATUS = [
   '',
   'laik',
   'laik_dengan_catatan',
+  'laik_dengan_restriksi',
   'tidak_laik',
 ];
 
@@ -52,19 +53,6 @@ const medicalCheckupSchema = new mongoose.Schema(
     },
 
     diagnosis3: {
-      type: String,
-      default: '',
-    },
-
-    temperature: {
-      type: Number,
-    },
-
-    oxygenSaturation: {
-      type: Number,
-    },
-
-    romberg: {
       type: String,
       default: '',
     },
