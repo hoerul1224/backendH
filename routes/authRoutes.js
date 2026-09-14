@@ -67,6 +67,31 @@ router.get('/users', authMiddleware, adminOnly, async (req, res) => {
 });
 
 // UPDATE role user (khusus admin)
+router.put('/users/:id/role', authMiddleware, adminOnly, async (req, res) => {
+  try {
+    const { role } = req.body;
+    const validRoles = [
+      'pekerja',
+      'petugas_dcu',
+      'tenaga_kesehatan',
+      'kepala_departemen',
+    ];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ error: 'Role tidak valid' });
+    }
+    const user = await User.findByIdAndUpdate(
+      req.params.id,
+      { role },
+      { new: true }
+    );
+    if (!user) return res.status(404).json({ error: 'User tidak ditemukan' });
+    res.json(user);
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+// UPDATE klasifikasi pekerjaan user (khusus admin)
 router.put('/users/:id/work-classification', authMiddleware, adminOnly, async (req, res) => {
   try {
     const { workClassification } = req.body;

@@ -6,6 +6,7 @@ const User = require('../models/User');
 const authMiddleware = require('../middleware/auth');
 const adminOnly = require('../middleware/adminOnly');
 const summaryAccess = require('../middleware/summaryAccess');
+const dcuAccess = require('../middleware/dcuAccess');
 
 function buildDateFilter(query) {
   const { day, month, year } = query;
@@ -63,8 +64,8 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-// ADMIN: melihat semua data MCU
-router.get('/admin', authMiddleware, adminOnly, async (req, res) => {
+// ADMIN/KEPALA DEPT: melihat semua data MCU (view only untuk kepala departemen)
+router.get('/admin', authMiddleware, summaryAccess, async (req, res) => {
   try {
     const filter = buildDateFilter(req.query);
 
@@ -162,8 +163,10 @@ router.get(
             }
           : {}),
       };
+      // Tidak lagi difilter role — hitung SEMUA user yang
+      // terdaftar di Manajemen User, sesuai employmentStatus
+      // (Status Pekerja) yang dipilih di filter
       const userFilter = {
-        role: 'pekerja',
         ...(selectedWorkStatuses.length > 0
           ? {
               employmentStatus: {
@@ -172,16 +175,19 @@ router.get(
             }
           : {}),
       };
+
       const [records, totalUsers] = await Promise.all([
         MedicalCheckup.find(medicalCheckupFilter)
-          .populate('user', '_id role')
+          .populate('user', 'role')
           .lean(),
         User.countDocuments(userFilter),
       ]);
+
+      // Hitung semua record yang usernya masih valid/terdaftar
+      // (tidak dibatasi role tertentu lagi), supaya sebanding
+      // dengan totalUsers yang sekarang juga menghitung semua user
       const pekerjaRecords = records.filter(
-        (record) =>
-          record.user &&
-          record.user.role === 'pekerja'
+        (record) => record.user
       );
       const healthDegrees = [
         'P1',
@@ -493,7 +499,7 @@ router.put('/admin/:id/followup', authMiddleware, adminOnly, async (req, res) =>
 router.put(
   '/admin/:id/verify',
   authMiddleware,
-  summaryAccess,
+  dcuAccess,
   async (req, res) => {
     try {
       const { followUpHealthDegree, followUpFitnessStatus } = req.body;
