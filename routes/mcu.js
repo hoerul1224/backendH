@@ -315,36 +315,6 @@ router.get(
           verifiedRecords,
           normalizeText
         );
-      console.log(
-  '[MCU health-summary debug]',
-  {
-    totalRecords: records.length,
-    pekerjaRecords:
-      pekerjaRecords.length,
-    totalUsers,
-    usersWithMcu,
-    rawHealthDegreeMCU: [
-      ...new Set(
-        pekerjaRecords.map(
-          (record) =>
-            record.healthDegree
-        )
-      ),
-    ],
-    rawHealthDegreeFollowUp: [
-      ...new Set(
-        verifiedRecords.map(
-          (record) =>
-            record.followUpHealthDegree
-        )
-      ),
-    ],
-    calculatedHealthDegreeMCU:
-      healthDegreeMCU,
-    calculatedHealthDegreeFollowUp:
-      healthDegreeFollowUp,
-  }
-);
       res.json({
         healthDegreeMCU,
         fitnessMCU,
