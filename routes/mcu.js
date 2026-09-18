@@ -112,14 +112,27 @@ router.get(
         { $match: match },
         {
           $project: {
+            user: '$user',
             diagnoses: ['$diagnosis1', '$diagnosis2', '$diagnosis3'],
           },
         },
         { $unwind: '$diagnoses' },
         { $match: { diagnoses: { $ne: '' } } },
+        // Dedup dulu per (diagnosis, user) — 1 orang dengan diagnosis
+        // sama di diagnosis1/2/3 sekaligus, atau di beberapa record
+        // MCU dalam periode ini, tetap dihitung 1x
         {
           $group: {
-            _id: { $toLower: { $trim: { input: '$diagnoses' } } },
+            _id: {
+              diagnosis: { $toLower: { $trim: { input: '$diagnoses' } } },
+              user: '$user',
+            },
+          },
+        },
+        // Baru hitung jumlah ORANG unik per diagnosis
+        {
+          $group: {
+            _id: '$_id.diagnosis',
             count: { $sum: 1 },
           },
         },

@@ -34,8 +34,8 @@ router.get('/', authMiddleware, async (req, res) => {
   }
 });
 
-// ADMIN: lihat data DCU SEMUA user sekaligus (filter opsional tanggal/bulan/tahun)
-router.get('/admin', authMiddleware, dcuAccess, async (req, res) => {
+// ADMIN/KEPALA DEPT: lihat data DCU SEMUA user sekaligus (view only untuk kepala departemen)
+router.get('/admin', authMiddleware, summaryAccess, async (req, res) => {
   try {
     const filter = buildDateFilter(req.query);
     const records = await DailyCheckup.find(filter)
@@ -74,21 +74,25 @@ router.get('/admin/summary', authMiddleware, summaryAccess, async (req, res) => 
     const usersWithDcu = uniqueUserIds.size;
 
     const classifications = ['Plant', 'Komorbid', 'Security & CSO', 'Driver', 'Health', 'Office', 'Lainnya'];
-        const userCounts = await User.aggregate([
-      {
-        $project: {
-          classification: {
-            $cond: [
-              { $in: ['$workClassification', classifications] },
-              '$workClassification',
-              'Lainnya',
-            ],
-          },
-        },
-      },
-      { $group: { _id: '$classification', count: { $sum: 1 } } },
-    ]);
-    const userCountMap = Object.fromEntries(userCounts.map((u) => [u._id, u.count]));
+
+    // Ambil workClassification mentah dan normalisasi manual (trim + case-insensitive)
+    // supaya selisih spasi/huruf besar-kecil di database tidak bikin pekerja
+    // salah ke-bucket jadi "Lainnya"
+    const rawUsers = await User.find({}, 'workClassification').lean();
+
+    const userCountMap = {};
+    classifications.forEach((c) => {
+      userCountMap[c] = 0;
+    });
+
+    rawUsers.forEach((u) => {
+      const normalized = String(u.workClassification ?? '').trim();
+      const matched = classifications.find(
+        (c) => c.toLowerCase() === normalized.toLowerCase()
+      );
+      const key = matched || 'Lainnya';
+      userCountMap[key] = (userCountMap[key] || 0) + 1;
+    });
 
     const summary = classifications.map((c) => ({
       classification: c,
@@ -97,8 +101,20 @@ router.get('/admin/summary', authMiddleware, summaryAccess, async (req, res) => 
       Fit: 0, Unfit: 0,
     }));
 
+    // Set user unik yang sudah DCU per klasifikasi — dipakai untuk
+    // menghitung persentase CAKUPAN (0-100%), beda dengan totalDcu
+    // yang menghitung jumlah pemeriksaan (bisa lebih dari 1x per pekerja)
+    const usersWithDcuSetPerClassification = {};
+    classifications.forEach((c) => {
+      usersWithDcuSetPerClassification[c] = new Set();
+    });
+
     records.forEach((r) => {
-  const classification = r.user?.workClassification || 'Lainnya';
+  const normalized = String(r.user?.workClassification ?? '').trim();
+  const matchedClassification = classifications.find(
+    (c) => c.toLowerCase() === normalized.toLowerCase()
+  );
+  const classification = matchedClassification || 'Lainnya';
   const entry = summary.find((s) => s.classification === classification) || summary.find((s) => s.classification === 'Lainnya');
   if (!entry) return;
 
@@ -110,12 +126,22 @@ router.get('/admin/summary', authMiddleware, summaryAccess, async (req, res) => 
       } else if (r.fitnessStatus === 'laik' || r.fitnessStatus === 'laik_dengan_catatan') {
         entry.Fit += 1;
       }
+
+      if (r.user?._id) {
+        const targetSet =
+          usersWithDcuSetPerClassification[classification] ||
+          usersWithDcuSetPerClassification['Lainnya'];
+        targetSet.add(String(r.user._id));
+      }
     });
 
     const withRatio = summary.map((s) => {
       const totalDcu = s.Fit + s.Unfit;
       const ratio = s.totalUsers > 0 ? Math.round((totalDcu / s.totalUsers) * 100) : 0;
-      return { ...s, totalDcu, ratio };
+      const sudahDcu = usersWithDcuSetPerClassification[s.classification]?.size || 0;
+      const pelaksanaanPercent =
+        s.totalUsers > 0 ? Math.round((sudahDcu / s.totalUsers) * 100) : 0;
+      return { ...s, totalDcu, ratio, sudahDcu, pelaksanaanPercent };
     });
 
         res.json({ day: day ? parseInt(day) : null, month: month ? parseInt(month) : null, year: y, summary: withRatio, usersWithDcu });
@@ -211,11 +237,22 @@ router.get('/admin/top-complaints', authMiddleware, summaryAccess, async (req, r
       }
     }
 
-    const results = await DailyCheckup.aggregate([
+        const results = await DailyCheckup.aggregate([
       { $match: match },
+      // Dedup dulu per (keluhan, user) — supaya 1 orang yang lapor
+      // keluhan sama beberapa kali dalam periode ini tetap dihitung 1x
       {
         $group: {
-          _id: { $toLower: { $trim: { input: '$complaint' } } },
+          _id: {
+            complaint: { $toLower: { $trim: { input: '$complaint' } } },
+            user: '$user',
+          },
+        },
+      },
+      // Baru hitung jumlah ORANG unik per keluhan
+      {
+        $group: {
+          _id: '$_id.complaint',
           count: { $sum: 1 },
         },
       },
